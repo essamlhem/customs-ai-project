@@ -17,7 +17,12 @@ def send_telegram_file(file_path, caption):
                 requests.post(url, data={'chat_id': CHAT_ID, 'caption': caption}, files={'document': file})
         except Exception as e: print(f"Error: {e}")
 
-def run_advanced_scraping():
+def get_global_info(hs6):
+    """دالة تجريبية لجلب الوصف العالمي (يمكن تطويرها لربطها بـ API عالمي لاحقاً)"""
+    # حالياً سنضع رابطاً بحثياً للمودل ليستخدمه في التحقق
+    return f"https://www.foreign-trade.com/reference/hscode.htm?code={hs6}"
+
+def run_global_sync():
     api_url = "https://xlugavhmvnmagaxtcdxy.supabase.co/rest/v1/bands?select=%2A"
     headers = {'apikey': api_key.strip(), 'Authorization': f'Bearer {api_key.strip()}'}
 
@@ -26,29 +31,31 @@ def run_advanced_scraping():
         if response.status_code == 200:
             df = pd.DataFrame(response.json())
             
-            # 1. استخراج البند السوري وتنظيف الوصف
+            # تنظيف البيانات السورية
             df['band_syria'] = df['material'].str.extract(r'(\d{4,})')
             df['material_clean'] = df['material'].str.replace(r'\[.*?\]|\d+', '', regex=True).str.strip()
             
-            # 2. استخراج الرمز الدولي HS6 (أول 6 أرقام) - هذا هو "مفتاح" البحث العالمي
+            # استخراج الرمز الدولي HS6
             df['hs6_global'] = df['band_syria'].str[:6]
+            
+            # إضافة رابط التحقق العالمي لكل بند
+            df['global_verification_link'] = df['hs6_global'].apply(get_global_info)
             
             sync_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             df['last_updated'] = sync_time
 
-            # 3. حفظ نسخة الإكسل المعتادة
-            file_excel = "customs_ai_brain.xlsx"
+            # حفظ الملفات
+            file_excel = "customs_global_brain.xlsx"
             df.to_excel(file_excel, index=False)
             
-            # 4. حفظ نسخة الـ JSON للمودل (الذاكرة)
-            # هذه الخطوة تجعل البيانات جاهزة لتدريب المودل لاحقاً
+            # تحديث ذاكرة المودل JSON
             knowledge_base = df.to_json(orient="records", force_ascii=False)
             with open("knowledge_base.json", "w", encoding="utf-8") as f:
                 f.write(knowledge_base)
 
-            send_telegram_file(file_excel, f"✅ الذاكرة الجمركية جاهزة!\n📊 تم تحليل {len(df)} مادة.")
+            send_telegram_file(file_excel, f"🌍 تم ربط البيانات السورية بالروابط العالمية!\n📦 جاهز للمرحلة القادمة.")
             
     except Exception as e: print(f"Exception: {e}")
 
 if __name__ == "__main__":
-    run_advanced_scraping()
+    run_global_sync()
