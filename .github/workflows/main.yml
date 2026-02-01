@@ -2,8 +2,8 @@ name: Scheduled Data Fetching
 
 on:
   schedule:
-    - cron: "*/5 * * * *"  # كل 5 دقائق
-  workflow_dispatch:        # للتشغيل اليدوي
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,7 +13,8 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Set up Python
-        uses: setup-python@v2
+        # هنا كان الخطأ، أضفنا actions/ قبل setup-python
+        uses: actions/setup-python@v2
         with:
           python-version: '3.x'
 
@@ -22,7 +23,6 @@ jobs:
           pip install requests pandas openpyxl
 
       - name: Run Scraping Script
-        # هنا نقوم بفتح الخزنة وتمرير الأسرار للكود
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
