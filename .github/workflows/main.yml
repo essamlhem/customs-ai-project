@@ -1,22 +1,18 @@
 name: Scheduled Data Fetching
-
 on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Set up Python
-        # هنا كان الخطأ، أضفنا actions/ قبل setup-python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.9'
 
       - name: Install dependencies
         run: |
@@ -28,7 +24,7 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python Scraping.py
 
-      - name: Commit and Push changes
+      - name: Commit and Push
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
