@@ -1,16 +1,20 @@
 import requests
 import pandas as pd
-import re
 import os
 import json
+import hashlib
 from datetime import datetime
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsdWdhdmhtdm5tYWdheHRjZHh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk2ODkyNzQsImV4cCI6MjA1NTI2NTI3NH0.mCJzpoVbvGbkEwLPyaPcMZJGdaSOwaSEtav85rK-dWA"
 
+def send_telegram_msg(message):
+    if TELEGRAM_TOKEN and CHAT_ID:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        requests.post(url, data={'chat_id': CHAT_ID, 'text': message})
+
 def send_telegram_file(file_path, caption):
-    """دالة لإرسال أي نوع من الملفات لتليجرام"""
     if TELEGRAM_TOKEN and CHAT_ID:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument"
         try:
@@ -18,42 +22,51 @@ def send_telegram_file(file_path, caption):
                 requests.post(url, data={'chat_id': CHAT_ID, 'caption': caption}, files={'document': file})
         except Exception as e: print(f"Error: {e}")
 
-def get_global_info(hs6):
-    return f"https://www.foreign-trade.com/reference/hscode.htm?code={hs6}"
-
-def run_global_sync():
+def run_smart_sync():
     api_url = "https://xlugavhmvnmagaxtcdxy.supabase.co/rest/v1/bands?select=%2A"
     headers = {'apikey': api_key.strip(), 'Authorization': f'Bearer {api_key.strip()}'}
 
     try:
         response = requests.get(api_url, headers=headers)
         if response.status_code == 200:
-            df = pd.DataFrame(response.json())
+            raw_data = response.json()
+            # إنشاء "بصمة" للبيانات الحالية للتأكد من التغيير
+            current_hash = hashlib.md5(json.dumps(raw_data, sort_keys=True).encode()).hexdigest()
             
-            # معالجة البيانات
-            df['band_syria'] = df['material'].str.extract(r'(\d{4,})')
-            df['material_clean'] = df['material'].str.replace(r'\[.*?\]|\d+', '', regex=True).str.strip()
-            df['hs6_global'] = df['band_syria'].str[:6]
-            df['global_verification_link'] = df['hs6_global'].apply(get_global_info)
-            
-            sync_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            df['last_updated'] = sync_time
+            # قراءة البصمة القديمة إذا وجدت
+            last_hash = ""
+            if os.path.exists("last_hash.txt"):
+                with open("last_hash.txt", "r") as f: last_hash = f.read()
 
-            # 1. حفظ وإرسال ملف الإكسل
-            file_excel = "customs_global_brain.xlsx"
-            df.to_excel(file_excel, index=False)
-            send_telegram_file(file_excel, f"📊 ملف الإكسل المحدث\n📅 {sync_time}")
-            
-            # 2. حفظ وإرسال ملف الـ JSON (الذاكرة الجمركية)
-            file_json = "knowledge_base.json"
-            knowledge_base = df.to_json(orient="records", force_ascii=False)
-            with open(file_json, "w", encoding="utf-8") as f:
-                f.write(knowledge_base)
-            
-            # إرسال ملف الـ JSON فوراً بعد حفظه
-            send_telegram_file(file_json, f"🧠 ذاكرة المودل (JSON)\n📦 جاهزة للربط مع Across MENA")
-            
+            now = datetime.now()
+            is_end_of_day = now.hour == 23 and now.minute < 10 # تقرير نهاية اليوم (الساعة 11 مساءً)
+
+            # الحالة 1: وجود تحديث فعلي في البيانات
+            if current_hash != last_hash:
+                df = pd.DataFrame(raw_data)
+                df['band_syria'] = df['material'].str.extract(r'(\d{4,})')
+                df['material_clean'] = df['material'].str.replace(r'\[.*?\]|\d+', '', regex=True).str.strip()
+                df['hs6_global'] = df['band_syria'].str[:6]
+                sync_time = now.strftime("%Y-%m-%d %H:%M:%S")
+                
+                # حفظ الملفات
+                file_excel = "customs_global_brain.xlsx"
+                df.to_excel(file_excel, index=False)
+                with open("knowledge_base.json", "w", encoding="utf-8") as f:
+                    f.write(df.to_json(orient="records", force_ascii=False))
+                
+                # تحديث ملف البصمة
+                with open("last_hash.txt", "w") as f: f.write(current_hash)
+
+                # إرسال الملفات لوجود تحديث
+                send_telegram_file(file_excel, f"🆕 تحديث جديد تم رصده!\n📅 {sync_time}\n📊 تم تحليل {len(df)} مادة.")
+                send_telegram_file("knowledge_base.json", "🧠 ذاكرة JSON المحدثة")
+
+            # الحالة 2: لا يوجد تحديث وهي نهاية اليوم
+            elif is_end_of_day:
+                send_telegram_msg("🌙 تقرير نهاية اليوم: لم يتم تحديث أي بيانات جديدة اليوم.")
+
     except Exception as e: print(f"Exception: {e}")
 
 if __name__ == "__main__":
-    run_global_sync()
+    run_smart_sync()
