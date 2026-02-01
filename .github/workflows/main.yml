@@ -1,20 +1,28 @@
 name: Scheduled Data Fetching
+
 on:
   schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch:
+    - cron: '*/5 * * * *' # يعمل كل 5 دقائق
+  workflow_dispatch: # يسمح بتشغيله يدوياً
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # منح صلاحيات الكتابة لحفظ الملفات داخل المستودع
+    permissions:
+      contents: write
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           pip install requests pandas openpyxl
 
@@ -24,10 +32,13 @@ jobs:
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python Scraping.py
 
-      - name: Commit and Push
+      # هذا الجزء هو المسؤول عن إظهار الملفات في GitHub
+      - name: Commit and Push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add customs_full_data.xlsx
-          git commit -m "Update data" || exit 0
+          # إضافة كافة الملفات الناتجة للمستودع
+          git add customs_global_brain.xlsx knowledge_base.json last_hash.txt
+          # تنفيذ الحفظ في حال وجود تغييرات
+          git commit -m "Update data and hash: $(date)" || echo "No changes to commit"
           git push
