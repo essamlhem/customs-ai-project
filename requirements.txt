@@ -1,3 +1,2 @@
 pyTelegramBotAPI
-sentence-transformers
-numpy
+scikit-learn
