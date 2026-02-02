@@ -1,51 +1,22 @@
 import telebot
-import json
-import csv
-import os
+from Brain import AcrossMenaBrain
 
-# 1. إعداداتك (تأكد من وضع التوكن والـ ID)
-TOKEN = "YOUR_BOT_TOKEN_HERE" 
-CHAT_ID = "YOUR_CHAT_ID_HERE" 
+# استبدل النص التالي بالتوكن الذي حصلت عليه من BotFather
+TOKEN = '7629555239:AAFPr9N-XXXXXXXXXXXX' 
+
 bot = telebot.TeleBot(TOKEN)
+brain = AcrossMenaBrain()
 
-def send_data_as_csv():
-    json_path = "knowledge_base.json"
-    csv_path = "latest_scraped_data.csv"
-    
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            
-            if not data:
-                bot.send_message(CHAT_ID, "⚠️ ملف البيانات فارغ حالياً.")
-                return
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(message, "أهلاً بك يا عيسى في Across MENA! 🌍\nأنا جاهز لتحليل أي منتج تريد استيراده، شو ببالك اليوم؟")
 
-            # تحويل البيانات لـ CSV مرتب للإكسل
-            keys = data[0].keys()
-            with open(csv_path, 'w', newline='', encoding='utf-8-sig') as output_file:
-                dict_writer = csv.DictWriter(output_file, fieldnames=keys)
-                dict_writer.writeheader()
-                dict_writer.writerows(data)
-            
-            # إرسال الملف
-            with open(csv_path, 'rb') as f:
-                bot.send_document(CHAT_ID, f, caption="📊 إليك آخر نسخة من البيانات بصيغة إكسل (CSV)")
-            
-            os.remove(csv_path) # تنظيف
-            print("CSV Sent Successfully!")
-            
-        except Exception as e:
-            bot.send_message(CHAT_ID, f"❌ حدث خطأ أثناء تحويل الملف: {str(e)}")
-    else:
-        bot.send_message(CHAT_ID, "❌ لم يتم العثور على ملف الـ JSON. تأكد أن السكرابينج اكتمل.")
-
-# الإرسال فوراً عند التشغيل
-send_data_as_csv()
-
-# تشغيل البوت للاستقبال العادي
 @bot.message_handler(func=lambda message: True)
-def handle_all(message):
-    bot.reply_to(message, "البوت شغال، والملف انبعت فوق 👆")
+def handle_message(message):
+    user_query = message.text
+    # نمرر السؤال لـ "العقل" الذي بنيناه
+    response = brain.ask(user_query)
+    bot.reply_to(message, response)
 
+print("Bot is alive...")
 bot.infinity_polling()
