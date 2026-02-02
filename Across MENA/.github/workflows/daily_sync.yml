@@ -1,0 +1,24 @@
+name: Daily Scraper and Update
+
+on:
+  workflow_dispatch: # عشان تشغله يدوي "هلا" من زر Run Workflow
+  schedule:
+    - cron: '0 9 * * *' # رح يشتغل لحاله يومياً الساعة 9 صباحاً بتوقيت العالمي
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install requests pyTelegramBotAPI
+
+      - name: Run Scraper
+        run: python scraping.py
