@@ -1,71 +1,45 @@
 import json
-from difflib import get_close_matches
+from difflib import SequenceMatcher, get_close_matches
 
-# 1. قاموس Across MENA للمرادفات (العامي <-> الرسمي)
-SYRIAN_SYNONYMS = {
-    "دواليب": "إطارات مطاطية",
-    "كمبريسة": "ضاغط هواء",
-    "موتورات": "محرك احتراق داخلي",
-    "جنطات": "إطارات معدنية",
-    "نبريش": "أنابيب وخراطيم",
-    "سيفون": "أنابيب وخراطيم",
-    "لدات": "صمامات ثنائية باعثة للضوء",
-    "بروجكتورات": "صمامات ثنائية باعثة للضوء",
-    "بطاريات جيل": "مدخرات كهربائية",
-    "طاقة شمسية": "مدخرات كهربائية",
-    "راوتر": "أجهزة إرسال واستقبال بيانات",
-    "نانو": "أجهزة إرسال واستقبال بيانات",
-    "شوفاجات": "مشعات تدفئة",
-    "مكيفات": "أجهزة تكييف هواء",
-    "صاج": "منتجات مدرفلة من فولاذ",
-    "عدة صناعية": "أدوات يدوية من معادن",
-    "خردوات": "أدوات يدوية من معادن",
-    "ألبسة بالات": "ألبسة مستعملة",
-    "برادات": "ثلاجات ومجمدات",
-    "غسالات": "آلات غسل ألبسة",
-    "قماش": "منسوجات",
-    "سيراميك": "بلاط وصناعات خزفية",
-    "قداحة": "ولاعة جيب"
-}
+# ... (نفس قاموس المرادفات السابق) ...
 
-def clean_input(user_query):
-    """تنظيف النص وتبديل الكلمات العامية"""
-    query = user_query.strip().lower()
-    words = query.split()
-    # استبدال الكلمات إذا وجدت في القاموس، وإلا الحفاظ على الكلمة الأصلية
-    translated_words = [SYRIAN_SYNONYMS.get(w, w) for w in words]
-    return " ".join(translated_words)
+def calculate_confidence(str1, str2):
+    """حساب نسبة التشابه بين كلمتين"""
+    return round(SequenceMatcher(None, str1, str2).ratio() * 100, 1)
 
-def find_best_match(query, database_path="knowledge_base.json"):
-    """البحث في قاعدة البيانات عن أفضل تطابق"""
+def find_best_match_with_score(query, database_path="knowledge_base.json"):
     try:
         with open(database_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             
-        # قائمة المواد من ملف الـ JSON الخاص بك
         materials_list = [item['material_clean'] for item in data]
         
-        # البحث عن أقرب تطابق (نظام البحث المرن)
-        # cutoff=0.3 تعني قبول تشابه بسيط لتغطية أكبر قدر من الاحتمالات
-        matches = get_close_matches(query, materials_list, n=1, cutoff=0.3)
+        # الحصول على أفضل تطابق
+        matches = get_close_matches(query, materials_list, n=1, cutoff=0.2)
         
         if matches:
-            result = next(item for item in data if item['material_clean'] == matches[0])
+            match_name = matches[0]
+            confidence = calculate_confidence(query, match_name)
+            
+            # جلب البيانات الكاملة
+            result = next(item for item in data if item['material_clean'] == match_name)
+            
+            # إضافة نسبة الدقة للنتيجة
+            result['confidence_score'] = confidence
             return result
         return None
-    except FileNotFoundError:
-        return "خطأ: ملف قاعدة البيانات غير موجود."
     except Exception as e:
-        return f"خطأ غير متوقع: {e}"
+        return f"Error: {e}"
 
-# --- تجربة التشغيل للاختبار ---
-if __name__ == "__main__":
-    test_query = "بدي استورد كمبريسة"
-    processed = clean_input(test_query)
-    match = find_best_match(processed)
-    
-    if match:
-        print(f"✅ تم التعرف على المنتج: {match['material_clean']}")
-        print(f"🔢 البند الجمركي: {match['hs6_global']}")
-    else:
-        print("❌ لم يتم العثور على تطابق دقيق في قاعدة البيانات.")
+# --- تجربة التشغيل ---
+user_ask = "بدي جيب بطيخ" # تجربة كلمة غير موجودة بدقة
+processed = clean_input(user_ask)
+match = find_best_match_with_score(processed)
+
+if match:
+    # إذا كانت الدقة أقل من 60%، ننبه المستخدم
+    status = "✅ مؤكد" if match['confidence_score'] > 75 else "⚠️ تقريبي"
+    print(f"الحالة: {status} ({match['confidence_score']}%)")
+    print(f"المنتج: {match['material_clean']}")
+else:
+    print("❌ الدقة 0% - المادة غير موجودة")
