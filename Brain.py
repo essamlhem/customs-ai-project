@@ -5,38 +5,36 @@ class AcrossMenaBrain:
     def __init__(self):
         self.db_path = "knowledge_base.json"
 
-    def generate_image_url(self, hs_code):
-        # سنستخدم رابطاً ديناميكياً يعتمد على رقم البند الجمركي
-        # هذا مثال لرابط من قاعدة بيانات جمركية عالمية
-        return f"https://www.customs.gov.sy/images/items/{hs_code}.jpg"
-
     def ask(self, user_query):
-        # 1. المعالجة في طبقة الاستقبال
+        # 1. تنظيف وفهم المدخلات
         cleaned = clean_input(user_query)
-        match = find_best_match_with_score(cleaned)
+        # 2. البحث في قاعدة البيانات
+        match = find_best_match_with_score(cleaned, self.db_path)
 
-        if not match or match['confidence_score'] < 30:
-            return "عذراً يا عيسى، لم أستطع فهم المنتج بدقة. هل يمكنك المحاولة باسم آخر؟"
+        if not match:
+            return "❌ عذراً يا عيسى، لم أجد هذه المادة في قاعدة البيانات."
 
-        # 2. استخراج البيانات
-        name = match['material_clean']
-        hs_code = match['hs6_global']
-        price = match.get('priceFull', 'غير متوفر حالياً')
-        confidence = match['confidence_score']
+        # 3. صياغة الرد
+        name = match.get('material_clean', 'غير معروف')
+        hs_code = match.get('hs6_global', '000000')
+        price = match.get('priceFull', 'غير متوفر')
+        confidence = match.get('confidence_score', 0)
         
-        # 3. صياغة الرد الاحترافي
+        status = "✅ مؤكد" if confidence > 70 else "⚠️ تقريبي"
+
         response = f"""
-📦 **المنتج:** {name}
-🔢 **البند الجمركي:** {hs_code}
-💰 **التكلفة التقديرية:** {price}
-🎯 **دقة المطابقة:** {confidence}%
-
-🖼️ **صورة المنتج المقترحة:** {self.generate_image_url(hs_code)}
-
-💡 **نصيحة عبر مينا:** تأكد من مطابقة المواصفات الفنية للبند {hs_code} قبل الشحن.
+🎯 نتيجة البحث لـ "Across MENA":
+-------------------------------
+📦 المنتج: {name}
+🔢 البند الجمركي: {hs_code}
+💰 السعر التقديري: {price}
+📊 الدقة: {confidence}% ({status})
+-------------------------------
         """
         return response
 
-# --- تجربة العقل الآن ---
-brain = AcrossMenaBrain()
-print(brain.ask("بدي استورد موتورات"))
+# الاختبار التشغيلي
+if __name__ == "__main__":
+    brain = AcrossMenaBrain()
+    # جربنا كلمة موتورات لأننا وضعناها في القاموس
+    print(brain.ask("بدي استورد موتورات"))
