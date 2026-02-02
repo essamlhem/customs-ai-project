@@ -1,40 +1,17 @@
-import json
-from Receiver import clean_input, find_best_match_with_score
+from Receiver import find_best_match_semantic
 
 class AcrossMenaBrain:
     def __init__(self):
         self.db_path = "knowledge_base.json"
 
     def ask(self, user_query):
-        # 1. تنظيف وفهم المدخلات
-        cleaned = clean_input(user_query)
-        # 2. البحث في قاعدة البيانات
-        match = find_best_match_with_score(cleaned, self.db_path)
+        match = find_best_match_semantic(user_query, self.db_path)
 
-        if not match:
-            return "❌ عذراً يا عيسى، لم أجد هذه المادة في قاعدة البيانات."
+        if not match or match['confidence_score'] < 45: 
+            return f"❌ عذراً يا عيسى، مادة '{user_query}' غير موجودة في بياناتي الجمركية حالياً."
 
-        # 3. صياغة الرد
-        name = match.get('material_clean', 'غير معروف')
-        hs_code = match.get('hs6_global', '000000')
-        price = match.get('priceFull', 'غير متوفر')
-        confidence = match.get('confidence_score', 0)
-        
-        status = "✅ مؤكد" if confidence > 70 else "⚠️ تقريبي"
-
-        response = f"""
-🎯 نتيجة البحث لـ "Across MENA":
--------------------------------
-📦 المنتج: {name}
-🔢 البند الجمركي: {hs_code}
-💰 السعر التقديري: {price}
-📊 الدقة: {confidence}% ({status})
--------------------------------
-        """
-        return response
-
-# الاختبار التشغيلي
-if __name__ == "__main__":
-    brain = AcrossMenaBrain()
-    # جربنا كلمة موتورات لأننا وضعناها في القاموس
-    print(brain.ask("بدي استورد موتورات"))
+        return (f"🎯 نتيجة ذكية لـ Across MENA:\n\n"
+                f"📦 المنتج: {match['material_clean']}\n"
+                f"🔢 البند: {match['hs6_global']}\n"
+                f"💰 السعر: {match.get('priceFull', 'غير متوفر')}\n"
+                f"📊 الثقة: {match['confidence_score']}%")
