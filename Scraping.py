@@ -5,20 +5,23 @@ import os
 import json
 from datetime import datetime
 
-# استلام المفاتيح من نظام GitHub
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+# التعديل هنا ليتوافق مع أسماء الـ Secrets في GitHub
+BOT_TOKEN = os.getenv("BOT_TOKEN") 
 CHAT_ID = os.getenv("CHAT_ID")
 api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsdWdhdmhtdm5tYWdheHRjZHh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk2ODkyNzQsImV4cCI6MjA1NTI2NTI3NH0.mCJzpoVbvGbkEwLPyaPcMZJGdaSOwaSEtav85rK-dWA"
 
 def send_telegram(message=None, file_path=None, caption=None):
     """دالة شاملة للإرسال"""
-    if not TELEGRAM_TOKEN or not CHAT_ID: return
+    if not BOT_TOKEN or not CHAT_ID: 
+        print("❌ نقص في الإعدادات: تأكد من BOT_TOKEN و CHAT_ID")
+        return
+        
     if file_path:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument"
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
         with open(file_path, 'rb') as f:
             requests.post(url, data={'chat_id': CHAT_ID, 'caption': caption}, files={'document': f})
     elif message:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         requests.post(url, data={'chat_id': CHAT_ID, 'text': message})
 
 def run_global_sync():
@@ -31,7 +34,6 @@ def run_global_sync():
             file_json = "knowledge_base.json"
             sync_time = datetime.now().strftime("%Y-%m-%d %H:%M")
             
-            # فحص التغيير (بناءً على عدد المنتجات)
             is_updated = True
             if os.path.exists(file_json):
                 with open(file_json, "r", encoding="utf-8") as f:
@@ -47,14 +49,12 @@ def run_global_sync():
                 df['global_verification_link'] = "https://globaltradehelpdesk.org/ar/resources/search-hs-code"
                 df['last_updated'] = sync_time
 
-                # حفظ الملفات
                 with open(file_json, "w", encoding="utf-8") as f:
                     json.dump(new_data, f, ensure_ascii=False)
                 
                 df.to_excel("customs_global_brain.xlsx", index=False)
                 df.to_csv("customs_global_brain.csv", index=False, encoding='utf-8-sig')
 
-                # الإرسال
                 send_telegram(message=f"⚠️ تم رصد تحديث جديد! عدد المنتجات: {len(new_data)}")
                 send_telegram(file_path="customs_global_brain.xlsx", caption="📊 إكسل المحدث")
                 send_telegram(file_path="customs_global_brain.csv", caption="📑 CSV المحدث")
