@@ -1,15 +1,15 @@
 name: Daily Scraper Check
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # للتشغيل اليدوي
   schedule:
-    - cron: '0 6 * * *' # 9:00 صباحاً بتوقيت سوريا/السعودية
+    - cron: '0 6 * * *' # يعمل الساعة 9:00 صباحاً بتوقيت سوريا/السعودية (GMT+3)
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write # صلاحية ضرورية لتحديث ملف الذاكرة تلقائياً
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -24,7 +24,7 @@ jobs:
 
       - name: Run Scraping Script
         env:
-          TELEGRAM_TOKEN: ${{ secrets.BOT_TOKEN }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }} # التأكد من تطابق الاسم مع الـ Secrets والكود
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python Scraping.py
 
