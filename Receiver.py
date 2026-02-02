@@ -1,9 +1,6 @@
 import json
-import numpy as np
-from sentence_transformers import SentenceTransformer, util
-
-# تحميل مودل ذكي جداً يفهم اللغة العربية (مجاني ومفتوح المصدر)
-model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 def find_best_match_semantic(user_query, database_path="knowledge_base.json"):
     try:
@@ -12,16 +9,20 @@ def find_best_match_semantic(user_query, database_path="knowledge_base.json"):
         
         materials_list = [item['material_clean'] for item in data]
         
-        # تحويل النصوص لمتجهات تفهم المعنى
-        query_embedding = model.encode(user_query, convert_to_tensor=True)
-        materials_embeddings = model.encode(materials_list, convert_to_tensor=True)
+        # دمج استفسار المستخدم مع القائمة لتحليلها
+        all_texts = materials_list + [user_query]
         
-        # حساب التشابه المعنوي
-        cosine_scores = util.cos_sim(query_embedding, materials_embeddings)[0]
-        best_idx = np.argmax(cosine_scores.cpu().numpy())
+        vectorizer = TfidfVectorizer().fit_transform(all_texts)
+        vectors = vectorizer.toarray()
+        
+        # حساب التشابه بين آخر عنصر (السؤال) وكل العناصر اللي قبله
+        cosine_matrix = cosine_similarity([vectors[-1]], vectors[:-1])
+        best_idx = cosine_matrix.argmax()
+        highest_score = cosine_matrix[0][best_idx] * 100
         
         result = data[best_idx]
-        result['confidence_score'] = round(float(cosine_scores[best_idx]) * 100, 1)
+        result['confidence_score'] = round(highest_score, 1)
         return result
-    except:
+    except Exception as e:
+        print(f"Error: {e}")
         return None
