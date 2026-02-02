@@ -3,21 +3,34 @@ name: Daily Scraper Check
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * *' # هاي بتطلع الساعة 9 صباحاً بتوقيت سوريا/السعودية
+    - cron: '0 6 * * *' 
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # هاي الصلاحية ضرورية عشان يحفظ التعديلات
     steps:
       - uses: actions/checkout@v2
+      
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.9'
+          
       - name: Install dependencies
         run: pip install requests pandas openpyxl pyTelegramBotAPI
+        
       - name: Run Scraper
         env:
           TELEGRAM_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python Scraping.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git add knowledge_base.json
+          git commit -m "Update knowledge base" || echo "No changes to commit"
+          git push
