@@ -1,8 +1,8 @@
-name: Test Brain Logic
+name: Run Telegram Bot
 on: [push, workflow_dispatch]
 
 jobs:
-  test:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -10,5 +10,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Run Brain Test
-        run: python Brain.py
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Start Across MENA Bot
+        run: python Telegram_Bot.py
