@@ -1,94 +1,50 @@
 import requests
-import pandas as pd
-import os
 import json
-import hashlib
-from datetime import datetime, timedelta
+import os
+import telebot
 
-# إعدادات الربط (تأكد من وجودها في Secrets على GitHub)
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
-API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhsdWdhdmhtdm5tYWdheHRjZHh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk2ODkyNzQsImV4cCI6MjA1NTI2NTI3NH0.mCJzpoVbvGbkEwLPyaPcMZJGdaSOwaSEtav85rK-dWA"
+# إعدادات البوت والملفات
+TOKEN = "YOUR_BOT_TOKEN_HERE"
+CHAT_ID = "YOUR_CHAT_ID_HERE"
+DATA_FILE = "knowledge_base.json"
+bot = telebot.TeleBot(TOKEN)
 
-def send_telegram_msg(message):
-    """إرسال رسائل نصية لتليجرام"""
-    if TELEGRAM_TOKEN and CHAT_ID:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        requests.post(url, data={'chat_id': CHAT_ID, 'text': message})
+def scrape_data():
+    # --- هون بتحط كود السكرابينج اللي سويناه أول مرة ---
+    # مثال بسيط (استبدله بكود السحب الحقيقي تبعك):
+    new_data = [{"material_clean": "سمك تونة", "hs6_global": "160414"}] 
+    return new_data
 
-def send_telegram_file(file_path, caption):
-    """إرسال ملفات لتليجرام"""
-    if TELEGRAM_TOKEN and CHAT_ID:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendDocument"
-        try:
-            with open(file_path, 'rb') as file:
-                requests.post(url, data={'chat_id': CHAT_ID, 'caption': caption}, files={'document': file})
-        except Exception as e: print(f"Error sending file: {e}")
-
-def get_training_ref(hs6):
-    """مرجع تدريب المودل - Global Trade Helpdesk"""
-    if pd.isna(hs6) or hs6 == "": return ""
-    return f"https://globaltradehelpdesk.org/ar/resources/search-hs-code?productCode={hs6}"
-
-def run_smart_sync():
-    api_url = "https://xlugavhmvnmagaxtcdxy.supabase.co/rest/v1/bands?select=%2A"
-    headers = {'apikey': API_KEY.strip(), 'Authorization': f'Bearer {API_KEY.strip()}'}
-
-    try:
-        response = requests.get(api_url, headers=headers)
-        if response.status_code == 200:
-            raw_data = response.json()
+def run_sync():
+    print("🔄 بدأت عملية سحب البيانات...")
+    new_scraped_data = scrape_data()
+    
+    # 1. فحص إذا في ملف قديم للمقارنة
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            old_data = json.load(f)
+        
+        # 2. المقارنة (إذا تغيرت الداتا عن القديمة)
+        if new_scraped_data != old_data:
+            print("⚠️ تم كشف تحديث في البيانات!")
+            with open(DATA_FILE, 'w', encoding='utf-8') as f:
+                json.dump(new_scraped_data, f, ensure_ascii=False, indent=4)
             
-            # إنشاء بصمة للبيانات الحالية
-            current_hash = hashlib.md5(json.dumps(raw_data, sort_keys=True).encode()).hexdigest()
-            
-            last_hash = ""
-            if os.path.exists("last_hash.txt"):
-                with open("last_hash.txt", "r") as f: last_hash = f.read()
-
-            # ضبط التوقيت المحلي (UTC + 3 ساعات لتوقيت سوريا/السعودية)
-            now_local = datetime.utcnow() + timedelta(hours=3)
-            print(f"Checking at Local Time: {now_local.strftime('%Y-%m-%d %H:%M')}")
-
-            # شرط تقرير نهاية اليوم (بين 11:00 و 11:10 مساءً)
-            is_end_of_day = now_local.hour == 23 and now_local.minute < 15
-
-            # الحالة 1: وجود تحديث فعلي في البيانات
-            if current_hash != last_hash:
-                print("New data detected! Processing...")
-                df = pd.DataFrame(raw_data)
-                
-                df['band_syria'] = df['material'].str.extract(r'(\d{4,})')
-                df['material_clean'] = df['material'].str.replace(r'\[.*?\]|\d+', '', regex=True).str.strip()
-                df['hs6_global'] = df['band_syria'].str[:6]
-                df['training_ref'] = df['hs6_global'].apply(get_training_ref)
-                
-                sync_time = now_local.strftime("%Y-%m-%d %H:%M:%S")
-                df['last_updated'] = sync_time
-
-                file_excel = "customs_global_brain.xlsx"
-                file_json = "knowledge_base.json"
-                
-                df.to_excel(file_excel, index=False)
-                with open(file_json, "w", encoding="utf-8") as f:
-                    f.write(df.to_json(orient="records", force_ascii=False))
-                
-                with open("last_hash.txt", "w") as f:
-                    f.write(current_hash)
-
-                send_telegram_file(file_excel, f"🆕 تحديث بيانات جديد!\n📅 {sync_time}\n✅ تم ربط المراجع العالمية للتدريب.")
-                send_telegram_file(file_json, "🧠 ملف الذاكرة المحدث (JSON)")
-
-            # الحالة 2: لا يوجد تحديث ولكن حان وقت تقرير نهاية اليوم
-            elif is_end_of_day:
-                print("End of day reached. Sending status report...")
-                send_telegram_msg("🌙 تقرير Across MENA: تم فحص الموقع، ولا يوجد تحديثات جديدة اليوم. البصمة الحالية مطابقة للبيانات.")
-            
-            else:
-                print("No changes detected and not end of day. Standing by.")
-
-    except Exception as e:
-        print(f"حدث خطأ أثناء التشغيل: {e}")
+            # إرسال تنبيه للمدير ولإلك
+            bot.send_message(CHAT_ID, "📢 تحديث جديد! تم رصد تغييرات في أسعار أو مواد الموقع.")
+            with open(DATA_FILE, 'rb') as f:
+                bot.send_document(CHAT_ID, f, caption="📊 ملف البيانات المحدث (JSON)")
+        else:
+            print("✅ لا يوجد تغيير في البيانات اليوم.")
+            # اختياري: bot.send_message(CHAT_ID, "✅ تم الفحص اليومي: لا يوجد تحديثات.")
+    else:
+        # 3. أول مرة تشغيل (سحب نسخة أولية)
+        print("📥 أول تشغيل: سحب النسخة الأولية...")
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(new_scraped_data, f, ensure_ascii=False, indent=4)
+        
+        with open(DATA_FILE, 'rb') as f:
+            bot.send_document(CHAT_ID, f, caption="✅ النسخة الأولية من البيانات")
 
 if __name__ == "__main__":
-    run_smart_sync()
+    run_sync()
