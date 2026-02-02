@@ -1,27 +1,23 @@
-name: Daily Scraper and Update
+name: Daily Scraper Check
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 6 * * *' # هاي بتطلع الساعة 9 صباحاً بتوقيت سوريا/السعودية
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
+      - uses: actions/checkout@v2
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
           python-version: '3.9'
-
       - name: Install dependencies
-        run: pip install requests pyTelegramBotAPI
-
+        run: pip install requests pandas openpyxl pyTelegramBotAPI
       - name: Run Scraper
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python Scraping.py
