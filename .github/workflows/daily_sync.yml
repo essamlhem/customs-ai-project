@@ -1,4 +1,4 @@
-name: Daily Sync System
+name: Global_Sync_System
 
 on:
   workflow_dispatch:
@@ -6,32 +6,25 @@ on:
     - cron: '0 6 * * *'
 
 jobs:
-  run-sync:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
-      - name: Install Dependencies
-        run: pip install requests pandas openpyxl
-
-      - name: Execute Scraper
+      - run: pip install requests pandas openpyxl
+      - name: Run
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python Scraping.py
-
-      - name: Update Knowledge Base in Repo
+      - name: Save Status
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           git add knowledge_base.json
-          git commit -m "Auto-update database" || exit 0
+          git commit -m "update data" || exit 0
           git push
