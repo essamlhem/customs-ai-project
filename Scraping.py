@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import json
 import hashlib
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # إعدادات الربط (تأكد من وجودها في Secrets على GitHub)
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -39,33 +39,33 @@ def run_smart_sync():
         if response.status_code == 200:
             raw_data = response.json()
             
-            # إنشاء بصمة للبيانات الحالية لمقارنتها لاحقاً
+            # إنشاء بصمة للبيانات الحالية
             current_hash = hashlib.md5(json.dumps(raw_data, sort_keys=True).encode()).hexdigest()
             
             last_hash = ""
             if os.path.exists("last_hash.txt"):
                 with open("last_hash.txt", "r") as f: last_hash = f.read()
 
-            now = datetime.now()
-            # تقرير نهاية اليوم الساعة 11 مساءً
-            is_end_of_day = now.hour == 23 and now.minute < 10 
+            # ضبط التوقيت المحلي (UTC + 3 ساعات لتوقيت سوريا/السعودية)
+            now_local = datetime.utcnow() + timedelta(hours=3)
+            print(f"Checking at Local Time: {now_local.strftime('%Y-%m-%d %H:%M')}")
 
-            # الحالة 1: وجود تحديث فعلي
+            # شرط تقرير نهاية اليوم (بين 11:00 و 11:10 مساءً)
+            is_end_of_day = now_local.hour == 23 and now_local.minute < 15
+
+            # الحالة 1: وجود تحديث فعلي في البيانات
             if current_hash != last_hash:
+                print("New data detected! Processing...")
                 df = pd.DataFrame(raw_data)
                 
-                # معالجة البيانات وتحسينها
                 df['band_syria'] = df['material'].str.extract(r'(\d{4,})')
                 df['material_clean'] = df['material'].str.replace(r'\[.*?\]|\d+', '', regex=True).str.strip()
                 df['hs6_global'] = df['band_syria'].str[:6]
-                
-                # إضافة مرجع التدريب (الموقع العالمي)
                 df['training_ref'] = df['hs6_global'].apply(get_training_ref)
                 
-                sync_time = now.strftime("%Y-%m-%d %H:%M:%S")
+                sync_time = now_local.strftime("%Y-%m-%d %H:%M:%S")
                 df['last_updated'] = sync_time
 
-                # حفظ الملفات
                 file_excel = "customs_global_brain.xlsx"
                 file_json = "knowledge_base.json"
                 
@@ -76,13 +76,16 @@ def run_smart_sync():
                 with open("last_hash.txt", "w") as f:
                     f.write(current_hash)
 
-                # إرسال التحديث لتليجرام
                 send_telegram_file(file_excel, f"🆕 تحديث بيانات جديد!\n📅 {sync_time}\n✅ تم ربط المراجع العالمية للتدريب.")
                 send_telegram_file(file_json, "🧠 ملف الذاكرة المحدث (JSON)")
 
-            # الحالة 2: لا يوجد تحديث وهي نهاية اليوم
+            # الحالة 2: لا يوجد تحديث ولكن حان وقت تقرير نهاية اليوم
             elif is_end_of_day:
-                send_telegram_msg("🌙 تقرير Across MENA: لا يوجد تحديثات جديدة اليوم. تم الاعتماد على آخر بصمة بيانات.")
+                print("End of day reached. Sending status report...")
+                send_telegram_msg("🌙 تقرير Across MENA: تم فحص الموقع، ولا يوجد تحديثات جديدة اليوم. البصمة الحالية مطابقة للبيانات.")
+            
+            else:
+                print("No changes detected and not end of day. Standing by.")
 
     except Exception as e:
         print(f"حدث خطأ أثناء التشغيل: {e}")
