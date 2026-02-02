@@ -22,6 +22,6 @@ jobs:
 
       - name: Run Scraper
         env:
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }} # هون رح يسحبهم من الـ Secrets بأمان
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python scraping.py
+        run: python Scraping.py
